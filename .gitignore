@@ -1,0 +1,13 @@
+# Generated build/package output
+/build/
+/.cxx/
+
+# Local Android/IDE configuration
+/.idea/
+*.iml
+/local.properties
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+desktop.ini
