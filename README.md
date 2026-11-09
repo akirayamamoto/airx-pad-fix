@@ -4,9 +4,7 @@ AirXPadFix is a standalone root daemon for the MANGMI AIR X running Android 14. 
 controller-order problem caused by the firmware's persistent, non-input-producing `Xbox Wireless
 Controller` and can optionally present the awake physical controls as a standard Xbox 360 controller.
 
-It is not an Android application or Magisk module. It does not modify the system partition. The
-persistent package, configuration, logs, and recovery data live in `Download/AirXPadFix`; only a
-temporary executable copy is placed under `/dev` while the daemon is running.
+It is not an Android application or Magisk module. It does not modify the system partition. The package, configuration, and logs live in `Download/AirXPadFix`; recovery data lives there by default but can use a different `state_dir`. A temporary executable copy is placed under `/dev` while the daemon is running.
 
 The implementation and identities documented below were verified on an AIR X:
 
@@ -89,9 +87,7 @@ poll_ms=500
 state_dir=/sdcard/Download/AirXPadFix/state
 ```
 
-After changing any setting, run the top-level `AirXPadFix-restart.sh` through the AIR X root-script
-facility. Running `AirXPadFix-start.sh` is not enough when the daemon is already active because start
-is intentionally idempotent and will leave the existing process running.
+After changing any setting, run `AirXPadFix/restart.sh` or the top-level `AirXPadFix-restart.sh` through the AIR X root-script facility. Running `AirXPadFix-start.sh` is not enough when the daemon is already active because start leaves the existing process running.
 
 `state_dir` must be an absolute path. Do not change it while the daemon is active; stop the daemon first so pending recovery metadata stays at the known location.
 
@@ -156,8 +152,7 @@ If using an already-rooted interactive shell instead of the AIR X picker, the eq
 sh /sdcard/Download/AirXPadFix/start.sh
 ```
 
-The included `install.sh` validates and copies the package when it was staged somewhere other than
-`/sdcard/Download/AirXPadFix`. It is optional when the ZIP was extracted directly into Downloads.
+The included `install.sh` validates and copies a package staged outside `/sdcard/Download/AirXPadFix`. Run it from a root shell using its original path: the AIR X picker copies a selected script into a cache, so the installer cannot find the other package files when run through the picker. It is optional when the ZIP was extracted directly into Downloads.
 
 ## Deploy over wireless ADB
 
@@ -180,20 +175,21 @@ The runtime copy under `/dev` is removed by a reboot, so run `AirXPadFix-start.s
 
 Run the existing `AirXPadFix-stop.sh` as root before replacing package files. Back up any customized `config.conf`, extract the new package into Downloads, restore your config, and run `AirXPadFix-start.sh` as root. Extracting the ZIP over an existing installation replaces `config.conf`.
 
-Alternatively, extract the package to a separate directory and run its `install.sh` as root; the installer stops the existing daemon and preserves an existing `config.conf`. Copy the new top-level launcher scripts into Downloads, then start the daemon.
+Alternatively, extract the package to a separate directory and run its `install.sh` from a root shell using its original path; the installer stops the existing daemon and preserves an existing `config.conf`. Copy the new top-level launcher scripts into Downloads, then start the daemon.
 
 Start, stop, install, and uninstall refuse to overlap. If one is forcibly terminated and leaves the operation lock behind, reboot before retrying.
 
 ## Check status and logs
 
-Run `AirXPadFix-status.sh` through the root-script facility. It reports the PID, current mode, hidden
-nodes, and recent log entries. The persistent files are:
+Run `AirXPadFix-status.sh` through the root-script facility. It reports the PID, last recorded mode, hidden nodes, and recent log entries. The persistent files are:
 
 ```text
 /sdcard/Download/AirXPadFix/state/airxpadfix.pid
 /sdcard/Download/AirXPadFix/state/mode
 /sdcard/Download/AirXPadFix/state/airxpadfix.log
 ```
+
+The mode and recovery files use `state_dir` when it is customized. The PID and log remain in the default state folder. A mode can be stale after the daemon exits unexpectedly; check the reported running status as well.
 
 Expected modes are:
 
