@@ -93,8 +93,7 @@ After changing any setting, run the top-level `AirXPadFix-restart.sh` through th
 facility. Running `AirXPadFix-start.sh` is not enough when the daemon is already active because start
 is intentionally idempotent and will leave the existing process running.
 
-Do not change `state_dir` while the daemon is active. Stop it first so pending recovery metadata stays
-at the known location.
+`state_dir` must be an absolute path. Do not change it while the daemon is active; stop the daemon first so pending recovery metadata stays at the known location.
 
 ## Build
 
@@ -128,9 +127,12 @@ Extract the ZIP directly into the device's standard Download folder. The final l
   airxpadfixd
   config.conf
   install.sh
+  operation-lock.sh
   probe.sh
   recover.sh
+  restart.sh
   start.sh
+  state-dir.sh
   status.sh
   stop.sh
   uninstall.sh
@@ -170,21 +172,17 @@ adb -s <device-serial> push build/AirXPadFix-root-arm64-v8a.zip /sdcard/Download
 
 Extract the ZIP in Downloads, then run `AirXPadFix-start.sh` from the AIR X root-script facility. ADB shell is unprivileged on this firmware, so it cannot run the root scripts.
 
-## Start automatically after reboot
+## Start after reboot
 
-The runtime copy under `/dev` is removed by a reboot, so the daemon must be started again after every
-boot. Configure the AIR X root-script/startup facility to run the top-level `AirXPadFix-start.sh` at
-boot. It is safe to invoke more than once: if the daemon is already active, it reports the existing PID
-and does not start a second process.
+The runtime copy under `/dev` is removed by a reboot, so run `AirXPadFix-start.sh` again after each boot. The built-in root-script runner executes scripts manually; automatic startup requires a separately configured root-capable boot mechanism.
 
 ## Upgrade or apply configuration changes
 
-Replace the files in Downloads with the new package, then run `AirXPadFix-restart.sh` as root. Restart
-performs a graceful stop, restores the stock nodes, copies the new binary into `/dev`, and starts it
-with the current `config.conf`.
+Run the existing `AirXPadFix-stop.sh` as root before replacing package files. Back up any customized `config.conf`, extract the new package into Downloads, restore your config, and run `AirXPadFix-start.sh` as root. Extracting the ZIP over an existing installation replaces `config.conf`.
 
-If replacing the entire `AirXPadFix` directory, preserve a customized `config.conf` or reapply its
-settings before restarting.
+Alternatively, extract the package to a separate directory and run its `install.sh` as root; the installer stops the existing daemon and preserves an existing `config.conf`. Copy the new top-level launcher scripts into Downloads, then start the daemon.
+
+Start, stop, install, and uninstall refuse to overlap. If one is forcibly terminated and leaves the operation lock behind, reboot before retrying.
 
 ## Check status and logs
 
@@ -221,8 +219,7 @@ Stopping is also the immediate rollback if a game behaves badly with either oper
 
 ## Clean uninstall
 
-First disable the automatic `AirXPadFix-start.sh` entry in the AIR X startup facility. Then run
-`AirXPadFix-uninstall.sh` as root.
+If you configured a separate boot mechanism, disable its `AirXPadFix-start.sh` entry first. Then run `AirXPadFix-uninstall.sh` as root.
 
 The uninstaller:
 

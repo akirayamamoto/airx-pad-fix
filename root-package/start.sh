@@ -10,6 +10,8 @@ if [ "$(id -u)" != "0" ]; then
     echo "airxpadfix: start must run as root" >&2
     exit 1
 fi
+. "$INSTALL_DIR/operation-lock.sh" || exit 1
+. "$INSTALL_DIR/state-dir.sh" || exit 1
 
 mkdir -p "$INSTALL_DIR/state"
 
@@ -39,7 +41,7 @@ if ! sh "$INSTALL_DIR/recover.sh"; then
     echo "airxpadfix: recovery failed; refusing to start" >&2
     exit 1
 fi
-rm -f "$INSTALL_DIR/state/mode"
+rm -f "$STATE_DIR/mode" || exit 1
 
 # Shared storage is normally mounted noexec. Copy only the executable into /dev tmpfs; persistent
 # configuration, logs, and recovery metadata remain in Downloads.

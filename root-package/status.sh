@@ -4,7 +4,8 @@ INSTALL_DIR=/sdcard/Download/AirXPadFix
 RUNTIME_DAEMON=/dev/airxpadfix/airxpadfixd
 PID_FILE="$INSTALL_DIR/state/airxpadfix.pid"
 LOG_FILE="$INSTALL_DIR/state/airxpadfix.log"
-MODE_FILE="$INSTALL_DIR/state/mode"
+. "$INSTALL_DIR/state-dir.sh" || exit 1
+MODE_FILE="$STATE_DIR/mode"
 
 DAEMON_PID=
 for EXE_LINK in /proc/[0-9]*/exe; do
@@ -23,7 +24,7 @@ if [ -f "$MODE_FILE" ]; then
     echo "mode: $(cat "$MODE_FILE")"
 fi
 
-for STATE_FILE in "$INSTALL_DIR/state/real-node.state" "$INSTALL_DIR/state/virtual-node.state"; do
+for STATE_FILE in "$STATE_DIR/real-node.state" "$STATE_DIR/virtual-node.state"; do
     if [ -f "$STATE_FILE" ]; then
         echo "hidden node: $(sed -n '1p' "$STATE_FILE")"
     fi

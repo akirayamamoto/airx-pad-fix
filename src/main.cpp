@@ -365,6 +365,10 @@ class ControllerSwitcher {
           modeFile_(config_.stateDir + "/mode") {}
 
     bool initialize() {
+        if (config_.stateDir.empty() || config_.stateDir.front() != '/') {
+            logLine("ERROR", "Recovery state directory must be an absolute path");
+            return false;
+        }
         if (config_.realName.empty() || config_.virtualName.empty() ||
             lower(config_.realName) == lower(config_.virtualName)) {
             logLine("ERROR", "Controller names must be non-empty and different");

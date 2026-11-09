@@ -1,12 +1,12 @@
 #!/system/bin/sh
 
 INSTALL_DIR=/sdcard/Download/AirXPadFix
-STATE_DIR="$INSTALL_DIR/state"
 
 if [ "$(id -u)" != "0" ]; then
     echo "airxpadfix: recovery must run as root" >&2
     exit 1
 fi
+. "$INSTALL_DIR/state-dir.sh" || exit 1
 
 restore_state_file() {
     RECOVERY_FILE=$1
@@ -39,12 +39,28 @@ restore_state_file() {
     fi
 
     EVENT=${NODE##*/}
-    SYSFS_DEV=$(cat "/sys/class/input/$EVENT/dev" 2>/dev/null)
+    if ! SYSFS_DEV=$(cat "/sys/class/input/$EVENT/dev" 2>/dev/null); then
+        if [ ! -e "/sys/class/input/$EVENT" ] && [ ! -L "/sys/class/input/$EVENT" ] &&
+            ls /sys/class/input >/dev/null 2>&1; then
+            echo "airxpadfix: discarding stale recovery metadata for $EVENT"
+            rm -f "$RECOVERY_FILE" || return 1
+            return 0
+        fi
+        echo "airxpadfix: cannot read device information for $EVENT" >&2
+        return 1
+    fi
+    case "$SYSFS_DEV" in
+        *[!0-9:]*|:*|*:|*:*:*)
+            echo "airxpadfix: invalid device information for $EVENT" >&2
+            return 1 ;;
+        *:*) ;;
+        *) echo "airxpadfix: invalid device information for $EVENT" >&2; return 1 ;;
+    esac
     if [ "$SYSFS_DEV" != "$NODE_MAJOR:$NODE_MINOR" ]; then
         # A node cannot usefully be restored when its kernel device has gone away or the event index
         # was reassigned. If that controller returns, ueventd will create its new node normally.
         echo "airxpadfix: discarding stale recovery metadata for $EVENT"
-        rm -f "$RECOVERY_FILE"
+        rm -f "$RECOVERY_FILE" || return 1
         return 0
     fi
 
@@ -60,7 +76,7 @@ restore_state_file() {
             return 1
         fi
         # Android has already published this input device's node.
-        rm -f "$RECOVERY_FILE"
+        rm -f "$RECOVERY_FILE" || return 1
         return 0
     fi
 
@@ -89,7 +105,7 @@ restore_state_file() {
         rm -f "$STAGING"
         return 1
     fi
-    rm -f "$STAGING" "$RECOVERY_FILE"
+    rm -f "$STAGING" "$RECOVERY_FILE" || return 1
     echo "airxpadfix: restored $NODE"
 }
 
