@@ -1,24 +1,51 @@
 param(
-    [string]$SdkRoot = "$env:LOCALAPPDATA\Android\Sdk",
+    [string]$SdkRoot = $env:ANDROID_HOME,
     [string]$NdkRoot = $env:ANDROID_NDK_HOME
 )
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
 $Abi = "arm64-v8a"
+if (-not $SdkRoot) {
+    if ($env:ANDROID_SDK_ROOT) {
+        $SdkRoot = $env:ANDROID_SDK_ROOT
+    } elseif ($IsWindows -or $env:OS -eq "Windows_NT") {
+        $SdkRoot = Join-Path $env:LOCALAPPDATA "Android/Sdk"
+    } else {
+        $SdkRoot = Join-Path $HOME "Library/Android/sdk"
+    }
+}
+if (-not $NdkRoot) {
+    $NdkRoot = $env:ANDROID_NDK_ROOT
+}
 if (-not $NdkRoot) {
     $NdkParent = Join-Path $SdkRoot "ndk"
+    if (-not (Test-Path -LiteralPath $NdkParent)) {
+        throw "Android NDK directory was not found under $SdkRoot"
+    }
     $NdkRoot = Get-ChildItem -LiteralPath $NdkParent -Directory |
         Sort-Object { [version](($_.Name -split '-')[0]) } -Descending |
         Select-Object -First 1 -ExpandProperty FullName
 }
 if (-not $NdkRoot) {
-    throw "No side-by-side Android NDK installation was found under $SdkRoot\ndk"
+    throw "No side-by-side Android NDK installation was found under $SdkRoot/ndk"
 }
 
-$ToolchainBin = Join-Path $NdkRoot "toolchains/llvm/prebuilt/windows-x86_64/bin"
-$Compiler = Join-Path $ToolchainBin "aarch64-linux-android26-clang++.cmd"
-$Strip = Join-Path $ToolchainBin "llvm-strip.exe"
+if ($IsWindows -or $env:OS -eq "Windows_NT") {
+    $HostTag = "windows-x86_64"
+    $CompilerSuffix = ".cmd"
+    $StripSuffix = ".exe"
+} elseif ($IsMacOS) {
+    $HostTag = "darwin-x86_64"
+    $CompilerSuffix = ""
+    $StripSuffix = ""
+} else {
+    throw "The Android NDK build supports Windows and macOS hosts"
+}
+
+$ToolchainBin = Join-Path $NdkRoot "toolchains/llvm/prebuilt/$HostTag/bin"
+$Compiler = Join-Path $ToolchainBin "aarch64-linux-android26-clang++$CompilerSuffix"
+$Strip = Join-Path $ToolchainBin "llvm-strip$StripSuffix"
 if (-not (Test-Path -LiteralPath $Compiler) -or -not (Test-Path -LiteralPath $Strip)) {
     throw "Android ARM64 compiler or llvm-strip was not found under $ToolchainBin"
 }
@@ -68,7 +95,8 @@ $Archive = [IO.Compression.ZipArchive]::new(
 )
 try {
     Get-ChildItem -LiteralPath $StageParent -File -Recurse | ForEach-Object {
-        $RelativePath = $_.FullName.Substring($StageParent.Length).TrimStart('\') -replace '\\', '/'
+        $RelativePath = $_.FullName.Substring($StageParent.Length).TrimStart([char[]]@('\', '/'))
+        $RelativePath = $RelativePath.Replace('\', '/')
         $Entry = $Archive.CreateEntry($RelativePath, [IO.Compression.CompressionLevel]::Optimal)
         $InputStream = [IO.File]::OpenRead($_.FullName)
         $EntryStream = $Entry.Open()

@@ -98,13 +98,9 @@ at the known location.
 
 ## Build
 
-Install these Windows development tools:
+Install Android SDK Platform Tools for `adb` and a side-by-side Android NDK. Android Studio's SDK Manager can install both. The PowerShell build script supports Windows and macOS and selects the newest installed NDK. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` if the SDK is outside its default location.
 
-- Android SDK Platform Tools, for `adb`;
-- a side-by-side Android NDK from Android Studio's SDK Manager.
-
-The PowerShell build script selects the newest installed NDK and invokes its ARM64 Clang compiler
-directly. Gradle, an Android SDK platform, CMake, and Ninja are not required for this build.
+On macOS, run the script from PowerShell 7. Gradle, an Android SDK platform, CMake, and Ninja are not required for this build.
 
 From the project directory, run:
 
@@ -161,6 +157,19 @@ sh /sdcard/Download/AirXPadFix/start.sh
 The included `install.sh` validates and copies the package when it was staged somewhere other than
 `/sdcard/Download/AirXPadFix`. It is optional when the ZIP was extracted directly into Downloads.
 
+## Deploy over wireless ADB
+
+This pairing flow requires Android 11 or newer and the AIR X and host on the same Wi-Fi network. On the AIR X, enable Wireless debugging and open **Pair device with pairing code**. Pair from the host using the address and pairing port shown on that screen, then connect using the separate ADB port shown on the Wireless debugging page:
+
+```sh
+adb pair <air-x-ip>:<pairing-port>
+adb connect <air-x-ip>:<adb-port>
+adb devices -l
+adb -s <device-serial> push build/AirXPadFix-root-arm64-v8a.zip /sdcard/Download/
+```
+
+Extract the ZIP in Downloads, then run `AirXPadFix-start.sh` from the AIR X root-script facility. ADB shell is unprivileged on this firmware, so it cannot run the root scripts.
+
 ## Start automatically after reboot
 
 The runtime copy under `/dev` is removed by a reboot, so the daemon must be started again after every
@@ -206,9 +215,7 @@ Run `AirXPadFix-stop.sh` through the root-script facility, or from a root shell:
 sh /sdcard/Download/AirXPadFix/stop.sh
 ```
 
-The daemon destroys its generated devices, releases the physical controller, and restores the stock
-nodes before exiting. If graceful shutdown exceeds ten seconds, the script force-stops the daemon and
-runs `recover.sh` using the metadata written before each node removal.
+The daemon destroys its generated devices, releases the physical controller, and restores the stock nodes before exiting. If graceful shutdown exceeds ten seconds, the script force-stops the daemon and waits up to ten more seconds for it to exit before running `recover.sh`. It leaves recovery files in place and stops if the daemon still appears active.
 
 Stopping is also the immediate rollback if a game behaves badly with either operating mode.
 

@@ -5,6 +5,12 @@ RUNTIME_DIR=/dev/airxpadfix
 RUNTIME_DAEMON="$RUNTIME_DIR/airxpadfixd"
 PID_FILE="$INSTALL_DIR/state/airxpadfix.pid"
 
+daemon_is_running() {
+    [ -n "$DAEMON_PID" ] || return 1
+    DAEMON_EXE=$(readlink "/proc/$DAEMON_PID/exe" 2>/dev/null)
+    [ "$DAEMON_EXE" = "$RUNTIME_DAEMON" ]
+}
+
 if [ "$(id -u)" != "0" ]; then
     echo "airxpadfix: stop must run as root" >&2
     exit 1
@@ -31,14 +37,22 @@ fi
 if [ -n "$DAEMON_PID" ]; then
     kill -TERM "$DAEMON_PID" 2>/dev/null
     WAIT_COUNT=0
-    while [ -d "/proc/$DAEMON_PID" ] && [ "$WAIT_COUNT" -lt 10 ]; do
+    while daemon_is_running && [ "$WAIT_COUNT" -lt 10 ]; do
         sleep 1
         WAIT_COUNT=$((WAIT_COUNT + 1))
     done
-    if [ -d "/proc/$DAEMON_PID" ]; then
-        echo "airxpadfix: graceful stop timed out; forcing stop and recovering nodes" >&2
+    if daemon_is_running; then
+        echo "airxpadfix: graceful stop timed out; forcing daemon stop" >&2
         kill -KILL "$DAEMON_PID" 2>/dev/null
-        sleep 1
+        WAIT_COUNT=0
+        while daemon_is_running && [ "$WAIT_COUNT" -lt 10 ]; do
+            sleep 1
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+        done
+        if daemon_is_running; then
+            echo "airxpadfix: daemon did not exit; refusing node recovery" >&2
+            exit 1
+        fi
     fi
 fi
 

@@ -38,18 +38,28 @@ restore_state_file() {
         return 1
     fi
 
-    if [ -e "$NODE" ]; then
-        # Android has already published this event path, normally because /dev was rebuilt at boot.
-        rm -f "$RECOVERY_FILE"
-        return 0
-    fi
-
     EVENT=${NODE##*/}
     SYSFS_DEV=$(cat "/sys/class/input/$EVENT/dev" 2>/dev/null)
     if [ "$SYSFS_DEV" != "$NODE_MAJOR:$NODE_MINOR" ]; then
         # A node cannot usefully be restored when its kernel device has gone away or the event index
         # was reassigned. If that controller returns, ueventd will create its new node normally.
         echo "airxpadfix: discarding stale recovery metadata for $EVENT"
+        rm -f "$RECOVERY_FILE"
+        return 0
+    fi
+
+    if [ -e "$NODE" ]; then
+        if [ -L "$NODE" ] || [ ! -c "$NODE" ]; then
+            echo "airxpadfix: refusing unexpected existing path: $NODE" >&2
+            return 1
+        fi
+        NODE_DEV=$(stat -c '%t:%T' "$NODE" 2>/dev/null)
+        EXPECTED_DEV=$(printf '%x:%x' "$NODE_MAJOR" "$NODE_MINOR")
+        if [ "$NODE_DEV" != "$EXPECTED_DEV" ]; then
+            echo "airxpadfix: refusing mismatched existing node $NODE" >&2
+            return 1
+        fi
+        # Android has already published this input device's node.
         rm -f "$RECOVERY_FILE"
         return 0
     fi
@@ -84,6 +94,6 @@ restore_state_file() {
 }
 
 RESULT=0
-restore_state_file "$STATE_DIR/real-node.state" || RESULT=1
 restore_state_file "$STATE_DIR/virtual-node.state" || RESULT=1
+restore_state_file "$STATE_DIR/real-node.state" || RESULT=1
 exit "$RESULT"
